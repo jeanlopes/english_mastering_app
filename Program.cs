@@ -20,15 +20,36 @@ static void GetSubtitleLinks(string? searchTerm, string? seasonNumber)
         throw new Exception("Termo de busca não pode ser nulo");
 
     searchTerm = !string.IsNullOrWhiteSpace(seasonNumber) ? searchTerm + "-s" + seasonNumber : searchTerm;
-    string searchUrl = $"https://www.opensubtitles.org/en/search2/sublanguageid-eng/moviename-{Uri.EscapeDataString(searchTerm)}";
+    
 
 
     var web = new HtmlWeb();
-    var document = web.Load(searchUrl);
+    
+
+    HtmlNodeCollection? movieTitles;
+    var movieTitleCollection = new HtmlNodeCollection();
+    var offset = 0
+    do
+    {
+        var pagination = offset > 0 ? "/offset-" + offset : "";
+        var searchUrl = $"https://www.opensubtitles.org/en/search2/sublanguageid-eng/moviename-{Uri.EscapeDataString(searchTerm)}{ pagination }";
+        var document = web.Load(searchUrl);
+        movieTitles = document.DocumentNode.SelectNodes("//a[@class='bnone']");
+        if (movieTitles != null)
+        {
+            foreach (var title in movieTitles)
+            {
+                movieTitleCollection.Add(title);
+            }
+            break;
+        }
+        offset += 40;
+
+    } while (true)
+    
 
 
-    var movieTitles = document.DocumentNode.SelectNodes("//a[@class='bnone']");
-
+    Console.WriteLine(movieTitleCollection.Count);
 
 
 
