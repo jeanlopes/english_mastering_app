@@ -1,60 +1,132 @@
-﻿
+﻿using System.Data;
+using System.IO.Compression;
 using System.Text.RegularExpressions;
 using english_mastering_app;
 using HtmlAgilityPack;
 
-const string PATH = "D:/Documentos/workspace/english_mastering_app";
+// ESCOLHA DO TÍTULO E DOWNLOAD DA LEGENDA ZIPADA
+//const string PATH = "D:/Documentos/workspace/english_mastering_app";
+const string PATH = "C:/Users/jeano/workspace/english_mastering_app";
+const string ZIP_NAME = "/subtitle.zip";
 
-Console.WriteLine("Digite o nome do filme ou seriado:");
-var searchTerm = Console.ReadLine();
+//ChooseTitleAndDownload();
 
-Console.WriteLine("Digite o número da temporada (caso seja um seriado):");
-var seasonNumber = Console.ReadLine();
+//--------------------------------------------------------------------------------------------------------------
+// DESCOMPACTAR ARQUIVO ZIPADO E TRAZER PARA A MEMÓRIA
 
+//ZipFile.ExtractToDirectory(PATH + ZIP_NAME, PATH + "/subtitles");
 
-var links = GetMovieNameLinks(searchTerm, seasonNumber);
-Console.WriteLine("Escolha o título do filme ou seriado");
+var filePath = Directory.GetFiles(PATH + "/subtitles", "*.srt");
 
-var i = 1;
-links.ForEach(link =>
+var conteudo = File.ReadAllText(filePath[0]);
+conteudo = conteudo.Replace("<i>", "").Replace("</i>", "");
+
+var dataTable = new DataTable("Legendas");
+
+// Adicionar colunas ao DataTable
+dataTable.Columns.Add("Número", typeof(int));
+dataTable.Columns.Add("Tempo", typeof(string));
+dataTable.Columns.Add("Frase", typeof(string));
+
+// Dividir o conteúdo da string em linhas
+string[] linhas = conteudo.Split("\n", StringSplitOptions.RemoveEmptyEntries);
+
+// Variáveis para armazenar os valores
+int numero = 0;
+string tempo = string.Empty;
+string frase = string.Empty;
+
+foreach (string linha in linhas)
 {
-    Console.WriteLine($"{i} - {link.InnerText}");
-    i++;
-});
+    if (int.TryParse(linha, out int resultado))
+    {
+        if (numero != 0 && numero != resultado)
+        {
+            // Adicionar uma nova linha ao DataTable
+            dataTable.Rows.Add(numero, tempo, frase);
+            frase = string.Empty;
+        }
+        numero = resultado;
+    }
+    else if (linha.Contains("-->"))
+    {
+        tempo = linha.Trim();
+    }
+    else if (!string.IsNullOrWhiteSpace(linha))
+    {
+        // Armazenar a frase5
+        frase += string.IsNullOrEmpty(frase) ? linha.Trim() : " " + linha.Trim();
+    }
+}
 
-var sel = Convert.ToInt32(Console.ReadLine());
-var link = links[sel - 1].Attributes["href"].Value;
+// Exemplo de uso: percorrer as linhas do DataTable
+// foreach (DataRow row in dataTable.Rows)
+// {
+//     int numeroColuna = (int)row["Número"];
+//     string tempoColuna = (string)row["Tempo"];
+//     string fraseColuna = (string)row["Frase"];
 
-Console.WriteLine("Escolha a legenda para baixar");
+//     Console.WriteLine($"Número: {numeroColuna}, Tempo: {tempoColuna}, Frase: {fraseColuna}");
+// }
 
-var subtitleLinks = GetSubtitleLinks(link);
+//--------------------------------------------------------------------------------------------------------------
 
-i = 1;
-subtitleLinks.ForEach(sub =>
+Console.Read();
+
+async static void ChooseTitleAndDownload()
 {
-    Console.WriteLine($"{i} - {sub.Title}");
-    i++;
-});
+    Console.WriteLine("Digite o nome do filme ou seriado:");
+    var searchTerm = Console.ReadLine();
 
-sel = Convert.ToInt32(Console.ReadLine());
-var input = subtitleLinks[sel - 1].Link;
+    Console.WriteLine("Digite o número da temporada (caso seja um seriado):");
+    var seasonNumber = Console.ReadLine();
 
-var pattern = @"\D"; // Remove tudo exceto os números (\D é o inverso de \d)
+    var links = GetMovieNameLinks(searchTerm, seasonNumber);
+    Console.WriteLine("Escolha o título do filme ou seriado");
 
-var result = Regex.Replace(input, pattern, "");
+    var i = 1;
+    links.ForEach(link =>
+    {
+        Console.WriteLine($"{i} - {link.InnerText}");
+        i++;
+    });
 
-var subtitleUrlDownload = $"https://www.opensubtitles.org/en/subtitleserve/sub/{result}";
+    var sel = Convert.ToInt32(Console.ReadLine());
+    var link = links[sel - 1].Attributes["href"].Value;
 
-await DownloadFileFromUrl(subtitleUrlDownload, PATH);
+    Console.WriteLine("Escolha a legenda para baixar");
 
-Console.WriteLine("Download concluido");
+    var subtitleLinks = GetSubtitleLinks(link);
+
+    i = 1;
+    subtitleLinks.ForEach(sub =>
+    {
+        Console.WriteLine($"{i} - {sub.Title}");
+        i++;
+    });
+
+    sel = Convert.ToInt32(Console.ReadLine());
+    var input = subtitleLinks[sel - 1].Link;
+
+    var pattern = @"\D"; // Remove tudo exceto os números (\D é o inverso de \d)
+
+    var result = Regex.Replace(input, pattern, "");
+
+    var subtitleUrlDownload = $"https://www.opensubtitles.org/en/subtitleserve/sub/{result}";
+
+    await DownloadFileFromUrl(subtitleUrlDownload, PATH);
+
+    Console.WriteLine("Download concluido");
+}
 
 static List<HtmlNode> GetMovieNameLinks(string? searchTerm, string? seasonNumber)
 {
     if (searchTerm == null)
         throw new Exception("Termo de busca não pode ser nulo");
 
-    searchTerm = !string.IsNullOrWhiteSpace(seasonNumber) ? searchTerm + "-s" + seasonNumber : searchTerm;
+    searchTerm = !string.IsNullOrWhiteSpace(seasonNumber)
+        ? searchTerm + "-s" + seasonNumber
+        : searchTerm;
 
     var web = new HtmlWeb();
     HtmlNodeCollection? movieTitles;
@@ -63,7 +135,8 @@ static List<HtmlNode> GetMovieNameLinks(string? searchTerm, string? seasonNumber
     do
     {
         var pagination = offset > 0 ? "/offset-" + offset : "";
-        var searchUrl = $"https://www.opensubtitles.org/en/search2/sublanguageid-eng/moviename-{Uri.EscapeDataString(searchTerm)}{pagination}";
+        var searchUrl =
+            $"https://www.opensubtitles.org/en/search2/sublanguageid-eng/moviename-{Uri.EscapeDataString(searchTerm)}{pagination}";
         var document = web.Load(searchUrl);
         movieTitles = document.DocumentNode.SelectNodes("//a[@class='bnone']");
         if (movieTitles != null)
@@ -73,15 +146,16 @@ static List<HtmlNode> GetMovieNameLinks(string? searchTerm, string? seasonNumber
                 movieTitleCollection.Add(title);
             }
         }
-        else break;
+        else
+            break;
         offset += 40;
-
     } while (true);
 
     return movieTitleCollection;
 }
 
-static List<SubtitleDto> GetSubtitleLinks(string link){
+static List<SubtitleDto> GetSubtitleLinks(string link)
+{
     var web = new HtmlWeb();
     HtmlNodeCollection? subtitleLinks;
     HtmlNodeCollection? subtitleNames;
@@ -101,21 +175,20 @@ static List<SubtitleDto> GetSubtitleLinks(string link){
             foreach (var title in subtitleLinks)
             {
                 var name = subtitleNames[i].InnerText;
-                name = name
-                    .Split("&amp;")[0]
+                name = name.Split("&amp;")[0]
                     .Replace("onlineDownload Subtitles Searcher", "")
                     .Replace("\n", "")
                     .Replace("\r", "");
-                    
+
                 movieTitleCollection.Add(new SubtitleDto(name, title.Attributes["href"].Value));
                 i++;
             }
         }
-        else break;
+        else
+            break;
         offset += 40;
-
     } while (true);
-    
+
     return movieTitleCollection;
 }
 
@@ -127,6 +200,5 @@ static async Task DownloadFileFromUrl(string url, string savePath)
 
     var fileName = response.Content.Headers?.ContentDisposition?.FileName;
     byte[] fileContent = await response.Content.ReadAsByteArrayAsync();
-    await File.WriteAllBytesAsync(savePath+"/subtitle.zip", fileContent);
-    
+    await File.WriteAllBytesAsync(savePath + ZIP_NAME, fileContent);
 }
