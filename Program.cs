@@ -3,11 +3,14 @@ using System.IO.Compression;
 using System.Text.RegularExpressions;
 using english_mastering_app;
 using HtmlAgilityPack;
+using DotNetEnv;
 
+
+DotNetEnv.Env.Load();
 // ESCOLHA DO TÍTULO E DOWNLOAD DA LEGENDA ZIPADA
-//const string PATH = "D:/Documentos/workspace/english_mastering_app";
-const string PATH = "C:/Users/jeano/workspace/english_mastering_app";
-const string ZIP_NAME = "/subtitle.zip";
+string PATH = Env.GetString("PATH");
+//const string PATH = "C:/Users/jeano/workspace/english_mastering_app";
+string ZIP_NAME = Env.GetString("ZIP_NAME");
 
 //ChooseTitleAndDownload();
 
@@ -59,6 +62,12 @@ foreach (string linha in linhas)
     }
 }
 
+var frases = dataTable.AsEnumerable().Select(row => row.Field<string>("Frase")).Take(5).ToList();
+
+var textoInLoko = string.Join(" ", frases);
+
+Console.WriteLine(textoInLoko);
+
 // Exemplo de uso: percorrer as linhas do DataTable
 // foreach (DataRow row in dataTable.Rows)
 // {
@@ -73,7 +82,7 @@ foreach (string linha in linhas)
 
 Console.Read();
 
-async static void ChooseTitleAndDownload()
+async static void ChooseTitleAndDownload(string path, string zipName)
 {
     Console.WriteLine("Digite o nome do filme ou seriado:");
     var searchTerm = Console.ReadLine();
@@ -114,7 +123,7 @@ async static void ChooseTitleAndDownload()
 
     var subtitleUrlDownload = $"https://www.opensubtitles.org/en/subtitleserve/sub/{result}";
 
-    await DownloadFileFromUrl(subtitleUrlDownload, PATH);
+    await DownloadFileFromUrl(subtitleUrlDownload, path, zipName);
 
     Console.WriteLine("Download concluido");
 }
@@ -192,7 +201,7 @@ static List<SubtitleDto> GetSubtitleLinks(string link)
     return movieTitleCollection;
 }
 
-static async Task DownloadFileFromUrl(string url, string savePath)
+static async Task DownloadFileFromUrl(string url, string savePath, string zipName)
 {
     HttpClient httpClient = new HttpClient();
     HttpResponseMessage response = await httpClient.GetAsync(url);
@@ -200,5 +209,5 @@ static async Task DownloadFileFromUrl(string url, string savePath)
 
     var fileName = response.Content.Headers?.ContentDisposition?.FileName;
     byte[] fileContent = await response.Content.ReadAsByteArrayAsync();
-    await File.WriteAllBytesAsync(savePath + ZIP_NAME, fileContent);
+    await File.WriteAllBytesAsync(savePath + zipName, fileContent);
 }
